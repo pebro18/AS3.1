@@ -1,13 +1,9 @@
-import re
-from symbol import term
+import random
 import torch
 from torch import nn
-import random
-
-from Transition import Transition
 
 class Policy:
-    def __init__(self,epsilon,epsilon_decay,learning_rate):
+    def __init__(self,epsilon = 1,epsilon_decay = 0.99,learning_rate = 0.001):
         super().__init__()
         self.device = (
             "cuda"
@@ -36,23 +32,11 @@ class Policy:
         x = self.flatten(x)
         return self.model_stack(x)
     
-    def train(self, train_data : Transition):
-
-        
-
-        # forward pass
-        prediction = self.model_stack(state).gather(1, action)
-
-        # backward pass
-        with torch.no_grad():
-            target = reward + terminal * self.model_stack(next_state).max(1)[0].view(-1, 1)
-        loss = self.loss_fn(prediction, target)
-
-        # optimize
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
+    def init_model_with_random_weights(self):
+        for layer in self.model_stack:
+            if hasattr(layer, "reset_parameters"):
+                layer.reset_parameters()
+        pass
 
     def save(self, path):
         torch.save(self.model_stack.state_dict(), path)
@@ -60,13 +44,18 @@ class Policy:
     def load(self, path):
         self.model_stack.load_state_dict(torch.load(path))
 
+    def train(self, memory_batch, target_batch):
+        # TODO add gradient decent
+        
+        pass
+
     def select_action(self, state):
         # epilson greedy policy
-        if torch.rand(1) < self.epsilon:
-            return torch.tensor([[random.randrange(4)]], device=self.device, dtype=torch.long)
+        if random.random() < self.epsilon:
+            return torch.rand(4, device=self.device).max(0)[1].view(1, 1)
         else:
             with torch.no_grad():
-                return self.model_stack(state).max(1)[1].view(1, 1) 
+                return self.forward(state).max(0)[1].view(1, 1)
 
     def decay(self):
         if self.epsilon > 0.01:

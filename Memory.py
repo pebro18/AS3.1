@@ -3,9 +3,12 @@ from collections import deque
 import random
 
 class Memory:
-    def __init__(self) -> None:
-        self.memory = deque(maxlen=32000)
+    def __init__(self,capacity = 32000) -> None:
+        self.memory = deque(maxlen=capacity)
     
+    def init_memory(self):
+        pass
+
     def store(self, transition: Transition):
         self.memory.append(transition)
 
