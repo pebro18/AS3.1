@@ -7,6 +7,8 @@ class Memory:
         self.memory = deque(maxlen=capacity)
     
     def init_memory(self):
+
+        
         pass
 
     def store(self, transition: Transition):

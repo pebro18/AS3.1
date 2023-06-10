@@ -18,25 +18,27 @@ class Policy:
         self.epsilon_decay = epsilon_decay
         self.learning_rate = learning_rate
         self.flatten = nn.Flatten()
-        self.loss_fn = nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+
         self.model_stack = nn.Sequential(
             nn.Linear(8,128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 4)
-        )
+        ).to(self.device)
+
+        self.loss_fn = nn.MSELoss()
+        self.optimizer = torch.optim.Adam(self.model_stack.parameters(), lr=self.learning_rate)
 
     def forward(self, x):
-        x = self.flatten(x)
-        return self.model_stack(x)
+        tensor_x = torch.Tensor(x).to(self.device)
+        return self.model_stack(tensor_x).to(self.device)
     
     def init_model_with_random_weights(self):
         for layer in self.model_stack:
             if hasattr(layer, "reset_parameters"):
                 layer.reset_parameters()
-        pass
+
 
     def save(self, path):
         torch.save(self.model_stack.state_dict(), path)
@@ -44,18 +46,31 @@ class Policy:
     def load(self, path):
         self.model_stack.load_state_dict(torch.load(path))
 
-    def train(self, memory_batch, target_batch):
-        # TODO add gradient decent
-        
-        pass
+    def model_train(self, train_loader):
+
+        running_loss = 0.0
+        for batch, (X, y) in enumerate(train_loader):
+            X, y = torch.tensor(X.state).to(self.device), y.to(self.device)
+            pred = self.forward(X)
+            loss = self.loss_fn(pred, y)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+
+            # running_loss += loss.item()
+            # if batch % 10 == 9:
+            #     print(
+            #         f"[{batch + 1}] loss: {running_loss / 10}"
+            #     )
+            #     running_loss = 0.0
 
     def select_action(self, state):
         # epilson greedy policy
         if random.random() < self.epsilon:
-            return torch.rand(4, device=self.device).max(0)[1].view(1, 1)
+            return torch.rand(4, device=self.device).max(0)[1].view(1, 1).item()
         else:
             with torch.no_grad():
-                return self.forward(state).max(0)[1].view(1, 1)
+                return self.forward(state).max(0)[1].view(1, 1).item()
 
     def decay(self):
         if self.epsilon > 0.01:

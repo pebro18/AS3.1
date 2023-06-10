@@ -1,11 +1,13 @@
 import gymnasium as gym
+from tqdm import tqdm
+import datetime
 from Policy import Policy
 from Memory import Memory
 from Transition import Transition
 
 class Agent():
     def init(self,policy: Policy, memory: Memory, discount_factor: float = 1, amount_steps: int = 2000, memory_batch_size: int = 32):
-        self.env = gym.make("LunarLander-v2", render_mode="human")	
+        self.env = gym.make("LunarLander-v2", render_mode="rgb_array")	
         self.policy = policy
         self.memory = memory
 
@@ -28,18 +30,25 @@ class Agent():
         self.memory.init_memory()
         self.policy.init_model_with_random_weights()
 
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs), desc=f"Epochs: {epochs}", unit="epoch"):
             observation, info = self.env.reset()
-            for _ in range(self.amount_steps):
+            for _ in tqdm(range(self.amount_steps) , desc=f"Epoch: {epoch}", unit="step"):
                 action = self.policy.select_action(observation)
                 observation_prime, reward, terminated, truncated, info = self.env.step(action)
-                if self.terminated or self.truncated:
-                    observation, info = self.env.reset()
-                    continue
+                if terminated or truncated:
+                    #observation, info = self.env.reset()
+                    break
 
                 self.memory.store(Transition(observation, action, reward, observation_prime, terminated))
+                
+                # Not sure if this is the right action to take but according to a blog post they did this
+                # https://towardsdatascience.com/deep-q-network-dqn-ii-b6bf911b6b2c
+
+                if len(self.memory.memory) < self.memory_batch_size:
+                    continue
                 memory_batch = self.memory.sample()
                 target_batch = []
+
                 for transition in memory_batch:
                     target = None
                     
@@ -49,9 +58,9 @@ class Agent():
                     else:
                         target = transition.reward + self.discount_factor * action_prime
                     target_batch.append(target)
-                self.policy.train(memory_batch,target_batch)
-                observation = observation_prime
+                self.policy.model_train(zip(memory_batch,target_batch))
             self.policy.decay()
-
+        self.env.close()
+        self.policy.save(f'./Model_outputs/{epochs}_{datetime.datetime.now()}.pt')
         pass
 
