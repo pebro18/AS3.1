@@ -32,7 +32,11 @@ class Policy:
 
     def forward(self, x):
         tensor_x = torch.Tensor(x).to(self.device)
-        return self.model_stack(tensor_x).to(self.device)
+        
+        self.model_stack.eval()
+        output = self.model_stack(tensor_x).to(self.device)
+        self.model_stack.train()
+        return output
     
     def init_model_with_random_weights(self):
         for layer in self.model_stack:
@@ -48,21 +52,13 @@ class Policy:
 
     def model_train(self, train_loader):
 
-        running_loss = 0.0
         for batch, (X, y) in enumerate(train_loader):
-            X, y = torch.tensor(X.state).to(self.device), y.to(self.device)
-            pred = self.forward(X)
-            loss = self.loss_fn(pred, y)
             self.optimizer.zero_grad()
+            loss = self.loss_fn(X, y)
             loss.backward()
             self.optimizer.step()
 
-            # running_loss += loss.item()
-            # if batch % 10 == 9:
-            #     print(
-            #         f"[{batch + 1}] loss: {running_loss / 10}"
-            #     )
-            #     running_loss = 0.0
+        return loss.item()
 
     def select_action(self, state):
         # epilson greedy policy
@@ -75,5 +71,6 @@ class Policy:
     def decay(self):
         if self.epsilon > 0.01:
             self.epsilon *= self.epsilon_decay
+
 
 

@@ -18,5 +18,5 @@ from Agent import Agent
 
 Agent = Agent()
 Agent.init(Policy(),Memory())
-Agent.train(200)
-# Agent.run()
+#Agent.train(1000)
+Agent.run("Model_outputs/epochs_1000_20230614_000306.pt")
