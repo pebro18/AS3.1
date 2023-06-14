@@ -11,7 +11,7 @@ from Memory import Memory
 from Transition import Transition
 
 class Agent():
-    def init(self,policy: Policy, memory: Memory, discount_factor: float = 0.99, amount_steps: int = 2000, memory_batch_size: int = 32, tau: float = 0.001):
+    def init(self,policy: Policy, memory: Memory, discount_factor: float = 0.99, amount_steps: int = 2000, memory_batch_size: int = 32):
         self.env = gym.make("LunarLander-v2", render_mode="rgb_array")	
         self.policy = policy
         self.memory = memory
@@ -19,12 +19,11 @@ class Agent():
         self.discount = discount_factor
         self.amount_steps = amount_steps
         self.memory_batch_size = memory_batch_size
-        self.tau = tau
-
 
     def run(self,model_path: str):
-
         self.policy.load(model_path)
+        self.policy.model_stack.eval()
+        self.policy.epsilon = 0.0
 
         self.env = gym.make("LunarLander-v2", render_mode="human")
         observation, info = self.env.reset()
