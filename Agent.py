@@ -4,6 +4,7 @@ from tqdm import tqdm
 import gymnasium as gym
 from collections import deque
 import matplotlib.pyplot as plt
+import torch
 
 from Policy import Policy
 from Memory import Memory
@@ -57,9 +58,7 @@ class Agent():
                 score += reward
 
                 #learn
-                self.learn()
-                #align
-                # self.align_target_model()
+                self.batch_learn()
 
                 if terminated or truncated:
                     break
@@ -75,6 +74,7 @@ class Agent():
         self.policy.save(f'./Model_outputs/epochs_{epochs}_{timestamp}.pt')
         self.plot_scores(scores)
 
+
     def learn(self):
         if len(self.memory.memory) < self.memory_batch_size:
             return
@@ -84,16 +84,47 @@ class Agent():
         expected_q_batch = []
         target_q_batch = []
 
-        for transition in memory_batch:
-            target = None
-            action_prime = self.policy.forward(transition.next_state)
+        for transition in memory_batch:      
+            pred_q_values = self.policy.forward(transition.state)
+            pred_action = pred_q_values[transition.action]
 
-            target = transition.reward + self.discount * action_prime * (1 - transition.terminal)
-                
-            expected_q_batch.append(self.policy.forward(transition.state))
-            target_q_batch.append(target)
-        self.policy.model_train(zip(expected_q_batch, target_q_batch))
+            target_q_values = self.policy.forward(transition.next_state)
+            target_q_values = torch.max(target_q_values) * (1 - transition.terminal)
 
+            y_j = transition.reward + self.discount * target_q_values
+
+            expected_q_batch.append(pred_action)
+            target_q_batch.append(y_j)
+
+        expected_q_batch = torch.stack(expected_q_batch)
+        target_q_batch = torch.stack(target_q_batch)
+        self.policy_control.model_train(expected_q_batch, target_q_batch)
+
+    # Way faster method of learning the model
+    # this is meant to be a test/optimization method i found on github
+    def batch_learn(self):
+
+        if len(self.memory.memory) < self.memory_batch_size:
+            return
+
+        memory_batch = self.memory.sample()
+        states = [transition.state for transition in memory_batch]
+        actions = [transition.action for transition in memory_batch]
+        rewards = [transition.reward for transition in memory_batch]
+        next_states = [transition.next_state for transition in memory_batch]
+        terminals = [transition.terminal for transition in memory_batch]
+
+
+        pred_q_values = self.policy.forward(states)
+        pred_q_values = pred_q_values.gather(1, torch.tensor(actions,device=self.policy.device).unsqueeze(-1)).squeeze(-1)
+
+        target_q_values = self.policy.forward(next_states)
+        target_q_values = target_q_values.max(1)[0]
+        target_q_values[terminals] = 0.0
+
+        y_js = torch.tensor(rewards,device=self.policy.device).to(torch.float32) + self.discount * target_q_values
+
+        self.policy.model_train(pred_q_values, y_js)
 
     def plot_scores(self,scores):
         fig = plt.figure()
@@ -104,12 +135,3 @@ class Agent():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         plt.savefig(f'./Model_outputs/plot_{len(scores)}_{timestamp}.png')
         plt.show()
-
-
-    # WIP function to align the target model with the policy model
-    # Found some code on github that does this
-    # Would be interesting to try out once DQN is working
-    def align_target_model(self):
-        for target_param, param in zip(self.target_policy.model_stack.parameters(), self.policy.model_stack.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-

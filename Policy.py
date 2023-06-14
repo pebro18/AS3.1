@@ -50,15 +50,12 @@ class Policy:
     def load(self, path):
         self.model_stack.load_state_dict(torch.load(path))
 
-    def model_train(self, train_loader):
+    def model_train(self, X,y):
 
-        for batch, (X, y) in enumerate(train_loader):
-            self.optimizer.zero_grad()
-            loss = self.loss_fn(X, y)
-            loss.backward()
-            self.optimizer.step()
-
-        return loss.item()
+        self.optimizer.zero_grad()
+        loss = self.loss_fn(X, y)
+        loss.backward()
+        self.optimizer.step()
 
     def select_action(self, state):
         # epilson greedy policy
