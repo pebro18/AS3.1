@@ -1,6 +1,4 @@
-from ast import arg
 from datetime import datetime
-from math import e
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -36,6 +34,8 @@ class Agent:
 
     def run(self, model_path: str):
         self.policy_control.load(model_path)
+        self.policy_control.model_stack.eval()
+        self.policy_control.epsilon = 0.0
 
         self.env = gym.make("LunarLander-v2", render_mode="human")
         observation, info = self.env.reset()
@@ -111,15 +111,50 @@ class Agent:
         expected_q_batch = []
         target_q_batch = []
 
-        for transition in memory_batch:
-            target = None
-            action_prime = self.policy.forward(transition.next_state)
+        for transition in memory_batch:      
+            pred_q_values = self.policy_target.forward(transition.state)
+            pred_action = pred_q_values[transition.action]
 
-            target = transition.reward + self.discount * action_prime * (1 - transition.terminal)
-                
-            expected_q_batch.append(self.policy.forward(transition.state))
-            target_q_batch.append(target)
-        self.policy.model_train(zip(expected_q_batch, target_q_batch))
+            target_q_values = self.policy_target.forward(transition.next_state)
+            target_q_values = torch.max(target_q_values) * (1 - transition.terminal)
+
+            y_j = transition.reward + self.discount * target_q_values
+
+            expected_q_batch.append(pred_action)
+            target_q_batch.append(y_j)
+
+        expected_q_batch = torch.stack(expected_q_batch)
+        target_q_batch = torch.stack(target_q_batch)
+        self.policy_control.model_train(expected_q_batch, target_q_batch)
+
+
+    # Way faster method of learning the model
+    # this is meant to be a test/optimization method i found on github
+    # test run: model completes in 273 epochs
+    def batch_learn(self):
+
+        if len(self.memory.memory) < self.memory_batch_size:
+            return
+
+        memory_batch = self.memory.sample()
+        states = [transition.state for transition in memory_batch]
+        actions = [transition.action for transition in memory_batch]
+        rewards = [transition.reward for transition in memory_batch]
+        next_states = [transition.next_state for transition in memory_batch]
+        terminals = [transition.terminal for transition in memory_batch]
+
+
+        pred_q_values = self.policy_control.forward(states)
+        pred_q_values = pred_q_values.gather(1, torch.tensor(actions,device=self.policy_control.device).unsqueeze(-1)).squeeze(-1)
+
+        target_q_values = self.policy_target.forward(next_states)
+        target_q_values = target_q_values.max(1)[0]
+        target_q_values[terminals] = 0.0
+
+        y_js = torch.tensor(rewards,device=self.policy_control.device).to(torch.float32) + self.discount * target_q_values
+
+
+        self.policy_control.model_train(pred_q_values, target_q_values)
 
 
     def plot_scores(self, scores):

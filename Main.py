@@ -19,4 +19,4 @@ from Agent import Agent
 Agent = Agent()
 Agent.init(Policy(),Memory())
 Agent.train(2000)
-#Agent.run("Model_outputs/epochs_100_20230614_003917.pt")
+#Agent.run("Model_outputs/epochs_273_20230614_181016.pt")
