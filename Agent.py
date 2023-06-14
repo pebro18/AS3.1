@@ -112,7 +112,7 @@ class Agent:
         target_q_batch = []
 
         for transition in memory_batch:      
-            pred_q_values = self.policy_target.forward(transition.state)
+            pred_q_values = self.policy_control.forward(transition.state)
             pred_action = pred_q_values[transition.action]
 
             target_q_values = self.policy_target.forward(transition.next_state)
@@ -130,7 +130,6 @@ class Agent:
 
     # Way faster method of learning the model
     # this is meant to be a test/optimization method i found on github
-    # test run: model completes in 273 epochs
     def batch_learn(self):
 
         if len(self.memory.memory) < self.memory_batch_size:
