@@ -151,8 +151,6 @@ class Agent:
         target_q_values[terminals] = 0.0
 
         y_js = torch.tensor(rewards,device=self.policy_control.device).to(torch.float32) + self.discount * target_q_values
-
-
         self.policy_control.model_train(pred_q_values, target_q_values)
 
 
