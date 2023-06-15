@@ -97,7 +97,7 @@ class Agent():
 
         expected_q_batch = torch.stack(expected_q_batch)
         target_q_batch = torch.stack(target_q_batch)
-        self.policy_control.model_train(expected_q_batch, target_q_batch)
+        self.policy.model_train(expected_q_batch, target_q_batch)
 
     # Way faster method of learning the model
     # this is meant to be a test/optimization method i found on github
